@@ -1,6 +1,10 @@
+from functools import reduce 
+
 alphabet = ""
 for i in range(ord('a'), ord('z') + 1):
     alphabet += chr(i)
+
+is_terminal = lambda c: ord('a') <= ord(c) <= ord('z')
 
 def eliminate_left_recursion(grammar):
     """
@@ -33,20 +37,49 @@ def eliminate_left_recursion(grammar):
 
 
 def first(grammer, symbol, visited = None):
-    if visited is None:
-        visited = set()
-    if symbol in visited:
-        raise ValueError(f"There is a loop in grammar! {symbol = }, {visited = }")
-    visited.append(symbol)
+    """
+    if we have rule: A -> aB, C, bD, KJ then first(A) = {a, b} + first(C) + first(K) (if K is nullable, then we must add its follow to) 
+    """
+    # if visited is None:
+    #     visited = set()
+    # if symbol in visited:
+    #     raise ValueError(f"There is a loop in grammar! {symbol = }, {visited = }")
+    # visited.append(symbol)
 
-    is_terminal = lambda c: ord('a') <= ord(c) <= ord('z')
     ans = set()
     for product in grammer[symbol]:
         char = product[0]
         if is_terminal(char):
             ans.add(char)
         else:
-            ans.add(first())
+            # ans.add(first(grammar, char, visited))
+            ans.add(first(grammar, char))
+            #TODO: support nullable nt 
+
+    return ans 
+
+def follow(grammar, symbol, visited = None):
+    """
+    we must return all b's that we have in a form in: s->* XAbC for follow(A)
+    """
+    products = list(grammar.values())
+    products = reduce(lambda a, b: a + b, products)
+    
+    ans = set() 
+    for p in products: 
+        if not symbol in p:
+            continue 
+        last_index = 0
+        for i in range(p.count(symbol)):
+            last_index = p.index(nt, last_index) + 1
+            if last_index == len(p):
+                continue 
+            nxt = p[last_index] 
+            if is_terminal(nxt):
+                ans.add(nxt)
+            else:
+                ans.add(first(grammar, symbol))
+    return ans
 
 def factorize_grammar(grammar):
     new_grammar = {}
@@ -72,6 +105,7 @@ def factorize_grammar(grammar):
 
 def convert_to_ll1(grammar):
     grammar = eliminate_left_recursion(grammar)
+    follow(grammar, 'A')
     # grammar = factorize_grammar(grammar)
     return grammar
 
@@ -91,5 +125,5 @@ grammars = [
 
 for g in grammars:
     ll1_grammar = convert_to_ll1(g)
-    print(ll1_grammar)
+    # print(ll1_grammar)
 
