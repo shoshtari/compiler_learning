@@ -40,25 +40,38 @@ def first(grammer, symbol, visited = None):
     """
     if we have rule: A -> aB, C, bD, KJ then first(A) = {a, b} + first(C) + first(K) (if K is nullable, then we must add its follow to) 
     """
-    # if visited is None:
-    #     visited = set()
-    # if symbol in visited:
-    #     raise ValueError(f"There is a loop in grammar! {symbol = }, {visited = }")
-    # visited.append(symbol)
+
+    if visited is None:
+        visited = set()
+    visited.add(symbol)
 
     ans = set()
     for product in grammer[symbol]:
+        if not product:
+            ans.add("")
+            continue
+
         char = product[0]
+        if char in visited:
+            continue
+
         if is_terminal(char):
             ans.add(char)
         else:
-            # ans.add(first(grammar, char, visited))
-            ans.add(first(grammar, char))
-            #TODO: support nullable nt 
+            res = first(grammer, char, visited=visited)
+            ans = ans.union(res)
+            p_ind = 1
+            while "" in res and p_ind < len(product):
+                char = product[p_ind]
+                res = first(grammer, char)
+                ans = ans.union(res)
+                ans.remove("")
+            if p_ind == len(product):
+                ans.add("")
 
     return ans 
 
-def follow(grammar, symbol, visited = None):
+def follow(grammar, symbol, visited = set()):
     """
     we must return all b's that we have in a form in: s->* XAbC for follow(A)
     """
@@ -70,18 +83,89 @@ def follow(grammar, symbol, visited = None):
         if not symbol in p:
             continue 
         last_index = 0
-        for i in range(p.count(symbol)):
-            last_index = p.index(nt, last_index) + 1
+        for _ in range(p.count(symbol)):
+            last_index = p.index(symbol, last_index) + 1
             if last_index == len(p):
                 continue 
             nxt = p[last_index] 
             if is_terminal(nxt):
                 ans.add(nxt)
             else:
-                ans.add(first(grammar, symbol))
+                res = first(grammar, nxt)
+                ans = ans.union(res)
+                ind = last_index + 1
+                while "" in res and ind < len(p):
+                    char = p[ind]
+                    res = first(grammar, char)
+                    ans = ans.union(res)
+                    ind += 1
+                if ind == len(p):
+                    ans.add("")
+                else:
+                    ans.remove("")
+
     return ans
 
-def factorize_grammar(grammar):
+def find_follow(grammar, symbol, terminal, visited = None):
+    """
+    terminal must be part of first(symbol)
+    this function will find all X so that we have 'symbol -> terminal X' 
+    """
+
+    if visited is None:
+        visited = set()
+    visited.add(symbol)
+
+    ans = set()
+    for product in grammar[symbol]:
+        if not product:
+            continue
+
+        char = product[0]
+        if char in visited:
+            continue
+
+        if char == terminal:
+            ans.add(product[1:])
+            continue
+        if is_terminal(char):
+            continue
+
+
+
+        ind = 0
+        res = first(grammar, product[ind], visited=visited)
+        while "" in res and ind < len(product):
+            if terminal in res:
+                ans = ans.union(find_follow(grammar, product[ind], terminal))
+            ind += 1
+            if ind < len(product):
+                res = first(grammar, product[ind], visited=visited)
+
+
+    return ans 
+
+
+def remove_left_common(grammar):
+    available_non_terminals = list(set(alphabet) - set(grammar.keys()))
+    new_grammer = {}
+    while len(grammar) != len(new_grammer): 
+        if new_grammer:
+            grammar = new_grammer.copy()
+            new_grammer = {}.copy()
+
+        for nt in grammar.keys():
+            try:
+                new_nt = available_non_terminals.pop()
+            except:
+                return grammar
+            
+            for char in first(grammar, nt):
+                new_grammer[nt] = [f"{char}{new_nt}"]
+                new_grammer[new_nt] = list(find_follow(grammar, nt, char))
+            
+        
+def factorize_grammar():
     new_grammar = {}
     for non_terminal, productions in grammar.items():
         new_grammar[non_terminal] = []
@@ -105,25 +189,24 @@ def factorize_grammar(grammar):
 
 def convert_to_ll1(grammar):
     grammar = eliminate_left_recursion(grammar)
-    follow(grammar, 'A')
+    grammar = remove_left_common(grammar)
     # grammar = factorize_grammar(grammar)
     return grammar
 
 # Example input grammar
 grammars = [
-    {
-        'S': ['Sa', 'b', 'c'],
-        'A': ['Ab', 'a', 'S']
-    }, {
-        'S': ['aB', 'bA', ''],
-        'A': ['aS', 'bAA'],
-        'B': ['b'],
-    }, {
-        'S': ['Sa', 'Sb', 'c', 'd']
+{
+        'S': ['aA', 'aB'],
+        'A': ['x'],
+        'B': ['y'],
     }
 ]
 
-for g in grammars:
-    ll1_grammar = convert_to_ll1(g)
-    # print(ll1_grammar)
+
+for i in range(len(grammars)):
+    g = convert_to_ll1(grammars[i])
+    for k in  g:
+        print(f"for non terminal {k} first set is {first(g, k)} and follow set is {follow(g, k)}")
+    print(g)
+    print()
 
