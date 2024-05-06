@@ -145,52 +145,44 @@ def find_follow(grammar, symbol, terminal, visited = None):
 
     return ans 
 
-
-def remove_left_common(grammar):
-    available_non_terminals = list(set(alphabet) - set(grammar.keys()))
-    new_grammer = {}
-    while len(grammar) != len(new_grammer): 
-        if new_grammer:
-            grammar = new_grammer.copy()
-            new_grammer = {}.copy()
-
-        for nt in grammar.keys():
-            try:
-                new_nt = available_non_terminals.pop()
-            except:
-                return grammar
-            
-            for char in first(grammar, nt):
-                new_grammer[nt] = [f"{char}{new_nt}"]
-                new_grammer[new_nt] = list(find_follow(grammar, nt, char))
-            
-        
-def factorize_grammar():
+def remove_dummy_non_terminals(grammar):
+    dummies = set() 
+    for nt in grammar:
+        if len(grammar[nt]) == 1 and '' in grammar[nt]:
+            dummies.add(nt)
     new_grammar = {}
-    for non_terminal, productions in grammar.items():
-        new_grammar[non_terminal] = []
-        while len(productions) > 0:
-            current_production = productions.pop(0)
-            common_prefix = ''
-            for production in productions[:]:
-                while common_prefix != production[:len(common_prefix)]:
-                    common_prefix = common_prefix[:-1]
-                while current_production != current_production[:len(common_prefix)]:
-                    common_prefix = common_prefix[:-1]
-            if common_prefix:
-                new_non_terminal = non_terminal + "'"
-                new_grammar[new_non_terminal] = [production[len(common_prefix):] for production in [current_production] + productions]
-                new_grammar[non_terminal].append(common_prefix + new_non_terminal)
-            else:
-                new_grammar[non_terminal].append(current_production)
-        if not new_grammar[non_terminal]:
-            del new_grammar[non_terminal]
+    for nt in grammar:
+        if nt in dummies:
+            continue
+        new_grammar[nt] = []
+        for p in grammar[nt]:
+            new_p = p 
+            for d in dummies:
+                new_p = new_p.replace(d, '')
+            new_grammar[nt].append(new_p)
     return new_grammar
+def remove_left_common(grammar):
+    available_non_terminals = list(set(alphabet.upper()) - set(grammar.keys()))
+    new_grammer = {}
+
+    for nt in grammar.keys():
+        try:
+            new_nt = available_non_terminals.pop()
+        except:
+            return grammar
+        
+        for char in first(grammar, nt):
+            new_grammer[nt] = [f"{char}{new_nt}"]
+            new_grammer[new_nt] = list(find_follow(grammar, nt, char))
+    new_grammer = remove_dummy_non_terminals(new_grammer)
+    # if len(new_grammer) != len(grammar):
+    #     new_grammer = remove_left_common(new_grammer)
+    return new_grammer
+            
 
 def convert_to_ll1(grammar):
     grammar = eliminate_left_recursion(grammar)
     grammar = remove_left_common(grammar)
-    # grammar = factorize_grammar(grammar)
     return grammar
 
 # Example input grammar
